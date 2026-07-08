@@ -1,0 +1,243 @@
+import type { LeadIntent } from "./types";
+
+export type PropertyType = "Apartment" | "Villa" | "Builder Floor" | "Plot" | "Commercial";
+export type ArtKey = "apartment" | "villa" | "builderFloor" | "plot" | "commercial";
+
+export interface PropertyListing {
+  id: string;
+  title: string; // fictional/generic — this is sample pilot inventory, not real listings
+  city: string;
+  locality: string; // e.g. "Sector 65, Gurugram"
+  propertyType: PropertyType;
+  bhk: string | null; // "3 BHK", null for Plot/Commercial
+  priceCr: number; // numeric price ceiling in ₹ crore
+  areaSqft: number;
+  possession: "Ready to move" | "Under construction";
+  intentFit: LeadIntent[];
+  amenities: string[];
+  art: ArtKey;
+}
+
+/**
+ * Sample pilot inventory for the demo — fictional listings standing in for a
+ * real agency's CRM/MLS feed. Deliberately generic names (no real builders or
+ * addresses) since this is illustrative data for a sales pitch, not a real
+ * property database.
+ */
+export const INVENTORY: PropertyListing[] = [
+  {
+    id: "inv-01",
+    title: "Sector 65 Residency",
+    city: "Gurugram",
+    locality: "Sector 65, Gurugram",
+    propertyType: "Apartment",
+    bhk: "3 BHK",
+    priceCr: 2.1,
+    areaSqft: 1750,
+    possession: "Ready to move",
+    intentFit: ["buy", "invest"],
+    amenities: ["Clubhouse", "Gated community", "Power backup"],
+    art: "apartment",
+  },
+  {
+    id: "inv-02",
+    title: "Emerald Greens",
+    city: "Gurugram",
+    locality: "Sector 65, Gurugram",
+    propertyType: "Apartment",
+    bhk: "3 BHK",
+    priceCr: 2.35,
+    areaSqft: 1900,
+    possession: "Ready to move",
+    intentFit: ["buy"],
+    amenities: ["Swimming pool", "Gym", "24x7 security"],
+    art: "apartment",
+  },
+  {
+    id: "inv-03",
+    title: "Palm Court Floors",
+    city: "Gurugram",
+    locality: "Sector 57, Gurugram",
+    propertyType: "Apartment",
+    bhk: "2 BHK",
+    priceCr: 1.4,
+    areaSqft: 1150,
+    possession: "Under construction",
+    intentFit: ["buy", "rent"],
+    amenities: ["Covered parking", "Park facing"],
+    art: "apartment",
+  },
+  {
+    id: "inv-04",
+    title: "Meadow Villas",
+    city: "Gurugram",
+    locality: "Sector 82, Gurugram",
+    propertyType: "Villa",
+    bhk: "4 BHK",
+    priceCr: 3.8,
+    areaSqft: 3200,
+    possession: "Ready to move",
+    intentFit: ["buy"],
+    amenities: ["Private garden", "Servant quarters", "Gated community"],
+    art: "villa",
+  },
+  {
+    id: "inv-05",
+    title: "Golf Extension Floors",
+    city: "Gurugram",
+    locality: "Golf Course Extension Road, Gurugram",
+    propertyType: "Builder Floor",
+    bhk: "3 BHK",
+    priceCr: 1.9,
+    areaSqft: 1600,
+    possession: "Ready to move",
+    intentFit: ["buy", "invest"],
+    amenities: ["No shared walls", "Private terrace"],
+    art: "builderFloor",
+  },
+  {
+    id: "inv-06",
+    title: "Sports City Residency",
+    city: "Noida",
+    locality: "Sector 150, Noida",
+    propertyType: "Apartment",
+    bhk: "2 BHK",
+    priceCr: 1.05,
+    areaSqft: 1050,
+    possession: "Ready to move",
+    intentFit: ["invest", "buy", "rent"],
+    amenities: ["Sports facilities", "Clubhouse", "Jogging track"],
+    art: "apartment",
+  },
+  {
+    id: "inv-07",
+    title: "Expressway Greens",
+    city: "Noida",
+    locality: "Sector 143, Noida",
+    propertyType: "Apartment",
+    bhk: "2 BHK",
+    priceCr: 0.95,
+    areaSqft: 980,
+    possession: "Under construction",
+    intentFit: ["invest"],
+    amenities: ["Landscaped gardens", "Rainwater harvesting"],
+    art: "apartment",
+  },
+  {
+    id: "inv-08",
+    title: "Riverside Heights",
+    city: "Noida",
+    locality: "Noida Expressway",
+    propertyType: "Apartment",
+    bhk: "3 BHK",
+    priceCr: 1.6,
+    areaSqft: 1450,
+    possession: "Ready to move",
+    intentFit: ["buy", "invest"],
+    amenities: ["Clubhouse", "Kids play area"],
+    art: "apartment",
+  },
+  {
+    id: "inv-09",
+    title: "Sector 62 Floors",
+    city: "Noida",
+    locality: "Sector 62, Noida",
+    propertyType: "Builder Floor",
+    bhk: "2 BHK",
+    priceCr: 0.85,
+    areaSqft: 900,
+    possession: "Ready to move",
+    intentFit: ["rent", "invest"],
+    amenities: ["Metro nearby", "Covered parking"],
+    art: "builderFloor",
+  },
+  {
+    id: "inv-10",
+    title: "Dwarka Sector 12 Residency",
+    city: "Dwarka",
+    locality: "Sector 12, Dwarka",
+    propertyType: "Apartment",
+    bhk: "2 BHK",
+    priceCr: 1.1,
+    areaSqft: 1100,
+    possession: "Ready to move",
+    intentFit: ["buy"],
+    amenities: ["Metro nearby", "Community hall"],
+    art: "apartment",
+  },
+  {
+    id: "inv-11",
+    title: "Dwarka Sector 23 Residency",
+    city: "Dwarka",
+    locality: "Sector 23, Dwarka",
+    propertyType: "Apartment",
+    bhk: "3 BHK",
+    priceCr: 1.75,
+    areaSqft: 1500,
+    possession: "Ready to move",
+    intentFit: ["buy", "invest"],
+    amenities: ["Clubhouse", "Power backup"],
+    art: "apartment",
+  },
+  {
+    id: "inv-12",
+    title: "Greater Noida West Residency",
+    city: "Greater Noida",
+    locality: "Greater Noida West",
+    propertyType: "Apartment",
+    bhk: "2 BHK",
+    priceCr: 0.65,
+    areaSqft: 950,
+    possession: "Under construction",
+    intentFit: ["buy", "invest"],
+    amenities: ["Gated community", "Kids play area"],
+    art: "apartment",
+  },
+  {
+    id: "inv-13",
+    title: "Yamuna Expressway Plots",
+    city: "Greater Noida",
+    locality: "Yamuna Expressway, Greater Noida",
+    propertyType: "Plot",
+    bhk: null,
+    priceCr: 0.55,
+    areaSqft: 1500,
+    possession: "Ready to move",
+    intentFit: ["buy", "invest"],
+    amenities: ["Clear title", "Gated township"],
+    art: "plot",
+  },
+  {
+    id: "inv-14",
+    title: "Faridabad Sector 86 Residency",
+    city: "Faridabad",
+    locality: "Sector 86, Faridabad",
+    propertyType: "Apartment",
+    bhk: "3 BHK",
+    priceCr: 1.15,
+    areaSqft: 1400,
+    possession: "Ready to move",
+    intentFit: ["buy"],
+    amenities: ["Gated community", "Power backup"],
+    art: "apartment",
+  },
+  {
+    id: "inv-15",
+    title: "Indirapuram Residency",
+    city: "Ghaziabad",
+    locality: "Indirapuram, Ghaziabad",
+    propertyType: "Apartment",
+    bhk: "2 BHK",
+    priceCr: 0.72,
+    areaSqft: 1050,
+    possession: "Ready to move",
+    intentFit: ["buy", "rent"],
+    amenities: ["Market nearby", "Covered parking"],
+    art: "apartment",
+  },
+];
+
+/** All localities the demo recognises, for lightweight text matching. */
+export const KNOWN_LOCALITIES = Array.from(
+  new Set(INVENTORY.flatMap((p) => [p.locality, p.city])),
+);
