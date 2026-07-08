@@ -2,8 +2,16 @@
 
 A working demo of an AI that answers every property enquiry **in seconds**, qualifies the
 buyer in a natural WhatsApp‑style chat, and hands the agent a **hot, ready‑to‑call lead**
-with a one‑click reply — all running **privately on your own machine** via a local
-[Ollama](https://ollama.com) model (`qwen2.5:1.5b`). No cloud, no per‑message cost, no data leaving the laptop.
+with a one‑click reply.
+
+Two AI providers are supported, switched with a single env var:
+
+- **Local Ollama** (`qwen2.5:1.5b`) — runs **privately on your own machine**, no cloud, no
+  per‑message cost, no data leaving the laptop, but bounded by what a 1.5B model can reliably do
+  on CPU‑only hardware.
+- **Groq** (`llama-3.3-70b-versatile`) — a real 70B model over Groq's cloud API, far more
+  coherent over long conversations and still very fast, at the cost of no longer being fully
+  offline (needs a `GROQ_API_KEY` and internet). See [`.env.example`](.env.example).
 
 Built to be shown to a real estate agency owner as a ₹50,000 pilot concept.
 

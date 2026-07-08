@@ -1,18 +1,34 @@
 import type { Role } from "./types";
 
+// If GROQ_API_KEY is set, every chat/analysis call is routed to Groq's
+// OpenAI-compatible API (a real 70B model, no local install/GPU needed)
+// instead of the local Ollama server. Unset the key to fall back to fully
+// local/offline Ollama instantly — nothing else needs to change.
+export const GROQ_API_KEY = process.env.GROQ_API_KEY || "";
+export const USE_GROQ = !!GROQ_API_KEY;
+export const GROQ_BASE_URL =
+  process.env.GROQ_BASE_URL?.replace(/\/$/, "") || "https://api.groq.com/openai/v1";
+const GROQ_CHAT_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_ANALYZE_MODEL = process.env.GROQ_ANALYZE_MODEL || GROQ_CHAT_MODEL;
+
 export const OLLAMA_BASE_URL =
   process.env.OLLAMA_BASE_URL?.replace(/\/$/, "") || "http://127.0.0.1:11434";
 export const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "qwen2.5:1.5b";
 
-// The one-time lead-analysis step (extraction + summary + suggested reply)
-// is NOT on the buyer's live critical path — ChatClient.tsx's "finish" fires
-// it in the background rather than blocking the buyer's screen on it — so it
-// can afford a bigger, more capable model without hurting perceived chat
-// speed. Defaults to the same model as chat unless explicitly overridden.
-export const ANALYZE_MODEL = process.env.OLLAMA_ANALYZE_MODEL || OLLAMA_MODEL;
+// The model used for the live buyer-facing chat, and for the one-time
+// lead-analysis step (extraction + summary + suggested reply). Analysis runs
+// in the background (ChatClient.tsx's "finish" fires it without blocking the
+// buyer's screen) so it can afford a bigger/slower model than chat when on
+// Ollama; on Groq both are fast enough that one model for both is simplest
+// unless overridden.
+export const CHAT_MODEL = USE_GROQ ? GROQ_CHAT_MODEL : OLLAMA_MODEL;
+export const ANALYZE_MODEL = USE_GROQ
+  ? GROQ_ANALYZE_MODEL
+  : process.env.OLLAMA_ANALYZE_MODEL || OLLAMA_MODEL;
 
 // Keep the model resident in memory so a demo never pays the cold-load cost.
 // Applied to every request so no single call shortens the unload timer.
+// Ollama-only; Groq is a stateless cloud API with no concept of this.
 export const KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "4h";
 
 export interface OllamaMessage {
@@ -21,6 +37,7 @@ export interface OllamaMessage {
 }
 
 export interface OllamaHealth {
+  provider: "groq" | "ollama";
   reachable: boolean;
   version: string | null;
   models: string[];
@@ -70,8 +87,53 @@ async function fetchWithTimeout(
   }
 }
 
-export async function checkHealth(): Promise<OllamaHealth> {
+async function checkHealthGroq(): Promise<OllamaHealth> {
   const health: OllamaHealth = {
+    provider: "groq",
+    reachable: false,
+    version: null,
+    models: [],
+    modelInstalled: false,
+    requiredModel: CHAT_MODEL,
+    analyzeModelInstalled: false,
+    analyzeModel: ANALYZE_MODEL,
+    baseUrl: GROQ_BASE_URL,
+    error: null,
+  };
+  if (!GROQ_API_KEY) {
+    health.error = "GROQ_API_KEY is not set.";
+    return health;
+  }
+  try {
+    const res = await fetchWithTimeout(
+      `${GROQ_BASE_URL}/models`,
+      { headers: { Authorization: `Bearer ${GROQ_API_KEY}` } },
+      5000,
+    );
+    if (!res.ok) {
+      health.error =
+        res.status === 401
+          ? "Groq rejected the API key (401 Unauthorized)."
+          : `Groq responded with HTTP ${res.status}.`;
+      return health;
+    }
+    health.reachable = true;
+    const data = (await res.json()) as { data?: { id: string }[] };
+    health.models = (data.data ?? []).map((m) => m.id).sort();
+    health.modelInstalled = health.models.includes(CHAT_MODEL);
+    health.analyzeModelInstalled = health.models.includes(ANALYZE_MODEL);
+  } catch (err) {
+    health.error =
+      err instanceof Error && err.name === "AbortError"
+        ? "Timed out connecting to Groq."
+        : "Could not reach the Groq API.";
+  }
+  return health;
+}
+
+async function checkHealthOllama(): Promise<OllamaHealth> {
+  const health: OllamaHealth = {
+    provider: "ollama",
     reachable: false,
     version: null,
     models: [],
@@ -120,7 +182,38 @@ export async function checkHealth(): Promise<OllamaHealth> {
   return health;
 }
 
+export async function checkHealth(): Promise<OllamaHealth> {
+  return USE_GROQ ? checkHealthGroq() : checkHealthOllama();
+}
+
 export function remediationFor(health: OllamaHealth): Remediation | null {
+  if (health.provider === "groq") {
+    if (!health.reachable) {
+      return {
+        code: "ollama_unreachable",
+        title: "Groq API unreachable",
+        message: health.error || `Could not reach Groq at ${health.baseUrl}.`,
+        fix: "Check that GROQ_API_KEY in .env.local is set and valid, then retry.",
+      };
+    }
+    if (!health.modelInstalled) {
+      return {
+        code: "model_missing",
+        title: "Chat model unavailable on Groq",
+        message: `Groq doesn't currently list "${health.requiredModel}" as an available model.`,
+        fix: "Check GROQ_MODEL in .env.local against Groq's current model list.",
+      };
+    }
+    if (!health.analyzeModelInstalled) {
+      return {
+        code: "model_missing",
+        title: "Analysis model unavailable on Groq",
+        message: `Groq doesn't currently list "${health.analyzeModel}" as an available model.`,
+        fix: "Check GROQ_ANALYZE_MODEL in .env.local against Groq's current model list.",
+      };
+    }
+    return null;
+  }
   if (!health.reachable) {
     return {
       code: "ollama_unreachable",
@@ -164,9 +257,49 @@ export async function assertReady(): Promise<void> {
   if (remediation) throw new OllamaError(remediation);
 }
 
+async function chatOnceGroq(
+  messages: OllamaMessage[],
+  {
+    json = false,
+    temperature = 0.2,
+    numPredict = 700,
+    model = CHAT_MODEL,
+  }: { json?: boolean; temperature?: number; numPredict?: number; model?: string },
+): Promise<string> {
+  const res = await fetchWithTimeout(
+    `${GROQ_BASE_URL}/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens: numPredict,
+        ...(json ? { response_format: { type: "json_object" } } : {}),
+      }),
+    },
+    30000,
+  );
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(
+      `Groq chat failed with HTTP ${res.status}${errText ? `: ${errText.slice(0, 200)}` : ""}`,
+    );
+  }
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  return data.choices?.[0]?.message?.content ?? "";
+}
+
 /**
- * Non-streaming completion. When `json` is true we ask Ollama for structured
- * JSON output and the returned string is a JSON document.
+ * Non-streaming completion. When `json` is true we ask for structured JSON
+ * output and the returned string is a JSON document. Routes to Groq or local
+ * Ollama depending on whether GROQ_API_KEY is set (see USE_GROQ above).
  */
 export async function chatOnce(
   messages: OllamaMessage[],
@@ -174,9 +307,12 @@ export async function chatOnce(
     json = false,
     temperature = 0.2,
     numPredict = 700,
-    model = OLLAMA_MODEL,
+    model = CHAT_MODEL,
   }: { json?: boolean; temperature?: number; numPredict?: number; model?: string } = {},
 ): Promise<string> {
+  if (USE_GROQ) {
+    return chatOnceGroq(messages, { json, temperature, numPredict, model });
+  }
   const res = await fetchWithTimeout(
     `${OLLAMA_BASE_URL}/api/chat`,
     {
@@ -205,10 +341,11 @@ export async function chatOnce(
  * user's first real message returns its first token almost immediately.
  * Pass the full conversation-so-far (system + greeting) to cache all of it —
  * Ollama then only has to process the new user turn. Best-effort; errors are
- * swallowed.
+ * swallowed. No-op on Groq: it's a stateless cloud API with no local model
+ * load or KV cache to preload.
  */
 export async function warmModel(messages: OllamaMessage[]): Promise<void> {
-  if (messages.length === 0) return;
+  if (USE_GROQ || messages.length === 0) return;
   try {
     await fetchWithTimeout(
       `${OLLAMA_BASE_URL}/api/chat`,

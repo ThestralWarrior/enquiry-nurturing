@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { Check, Copy, Cpu, ChevronDown } from "lucide-react";
 
 export interface HealthState {
+  provider: "groq" | "ollama";
   reachable: boolean;
   version: string | null;
   models: string[];
@@ -33,7 +34,7 @@ function statusOf(h: HealthState | null): Status {
 
 const META: Record<Status, { label: string; dot: string; text: string; ring: string }> = {
   loading: { label: "Checking engine…", dot: "bg-slate-300 animate-pulse", text: "text-slate-500", ring: "ring-slate-200" },
-  ok: { label: "Local AI online", dot: "bg-emerald-500", text: "text-emerald-700", ring: "ring-emerald-200" },
+  ok: { label: "AI engine online", dot: "bg-emerald-500", text: "text-emerald-700", ring: "ring-emerald-200" },
   model_missing: { label: "Model not installed", dot: "bg-amber-500", text: "text-amber-700", ring: "ring-amber-200" },
   offline: { label: "AI engine offline", dot: "bg-rose-500", text: "text-rose-700", ring: "ring-rose-200" },
 };
@@ -57,6 +58,7 @@ export function useHealth(pollMs = 8000) {
       } catch {
         if (alive)
           setHealth({
+            provider: "ollama",
             reachable: false,
             version: null,
             models: [],
@@ -138,8 +140,12 @@ export default function HealthPill({ health }: { health: HealthState | null }) {
         <div className="absolute right-0 z-30 mt-2 w-80 animate-fade-in rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-lift">
           <div className="mb-3 flex items-center gap-2 border-b border-slate-100 pb-3">
             <Cpu className="h-4 w-4 text-ink-700" />
-            <span className="text-sm font-semibold text-ink-900">Local AI engine</span>
-            <span className="ml-auto text-[11px] font-medium text-slate-400">Ollama</span>
+            <span className="text-sm font-semibold text-ink-900">
+              {health?.provider === "groq" ? "AI engine" : "Local AI engine"}
+            </span>
+            <span className="ml-auto text-[11px] font-medium text-slate-400">
+              {health?.provider === "groq" ? "Groq" : "Ollama"}
+            </span>
           </div>
 
           <dl className="space-y-1.5 text-xs">
@@ -189,7 +195,9 @@ export default function HealthPill({ health }: { health: HealthState | null }) {
 
           {status === "ok" && (
             <p className="mt-3 text-xs text-slate-500">
-              Running privately on this machine — no cloud, no per-message cost.
+              {health?.provider === "groq"
+                ? "Running on Groq's cloud API (a 70B model) for fast, coherent replies."
+                : "Running privately on this machine — no cloud, no per-message cost."}
             </p>
           )}
         </div>

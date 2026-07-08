@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { SkylineLogo, BrandMark } from "@/components/BrandMark";
 import InquiryForm from "@/components/InquiryForm";
+import { USE_GROQ } from "@/lib/ollama";
 
 export default function LandingPage() {
   return (
@@ -82,7 +83,7 @@ export default function LandingPage() {
         <div className="animate-fade-up [animation-delay:120ms]">
           <div className="relative">
             <div className="absolute -inset-3 -z-10 rounded-[28px] bg-gradient-to-b from-gold-400/20 to-brand-500/10 blur-2xl" />
-            <InquiryForm />
+            <InquiryForm usingGroq={USE_GROQ} />
           </div>
         </div>
       </section>
@@ -119,7 +120,9 @@ export default function LandingPage() {
             <Sparkles className="h-3.5 w-3.5 text-gold-400" />
             Instant replies powered by{" "}
             <span className="font-semibold text-white">LeadPilot AI</span>
-            <span className="text-slate-500">· runs on‑premise</span>
+            <span className="text-slate-500">
+              {USE_GROQ ? "· instant AI, Delhi NCR" : "· runs on‑premise"}
+            </span>
           </div>
         </div>
       </footer>

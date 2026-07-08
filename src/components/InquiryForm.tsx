@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2, ShieldCheck, Zap } from "lucide-react";
 
-export default function InquiryForm() {
+export default function InquiryForm({ usingGroq = false }: { usingGroq?: boolean }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -128,7 +128,9 @@ export default function InquiryForm() {
 
         <p className="flex items-center justify-center gap-1.5 text-center text-xs text-slate-400">
           <ShieldCheck className="h-3.5 w-3.5" />
-          Your details stay private — processed locally, never sold.
+          {usingGroq
+            ? "Your details stay private — never sold or shared beyond your advisor."
+            : "Your details stay private — processed locally, never sold."}
         </p>
       </form>
     </div>
