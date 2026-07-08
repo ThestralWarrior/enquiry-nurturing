@@ -98,15 +98,30 @@ function hasTimelineSignal(lead: Lead): boolean {
   return TIMELINE_HINT_RE.test(text);
 }
 
+const FINANCING_HINT_RE =
+  /\bhome\s*loan\b|\bloan\b|\bself[\s-]?fund(?:ed|ing)?\b|\bself[\s-]?financ(?:e|ed|ing)\b|\bown\s+funds?\b|\bcash\b|\bpre-?approv(?:al|ed)\b|\bmortgage\b/i;
+
+/** Has the conversation already given any hint about financing? Same
+ *  rationale as `hasTimelineSignal` — without this, once budget/locality/
+ *  timeline are all known, `nextQuestion` would ask the financing question
+ *  forever, even after it's been answered, since financing isn't part of the
+ *  property-matching query. */
+function hasFinancingSignal(lead: Lead): boolean {
+  const text = [lead.initialMessage, ...lead.messages.map((m) => m.content)].join(" ");
+  return FINANCING_HINT_RE.test(text);
+}
+
 /**
  * What to ask next, given what's actually known so far. Single source of
  * truth shared by the seeded greeting, the input-side deferral, and the
  * output-side safety fallback — so none of them can ever ask a question one
  * of the others already just asked. Takes the full `lead` (not just the
- * matching query) so it can also tell whether timeline has already come up —
- * without that, once budget+locality are known this would ask the same
- * "when are you moving?" question forever, even after being answered, since
- * timeline isn't part of the property-matching query itself.
+ * matching query) so it can also tell whether timeline/financing have
+ * already come up — without that, once budget+locality are known this would
+ * ask the same questions forever, even after being answered, since neither
+ * is part of the property-matching query itself. Ends in a genuine terminal
+ * statement (no question) once everything is known, so the safety net can
+ * never loop the same question back at someone who already answered it.
  */
 export function nextQuestion(lead: Lead, query: MatchQuery): string {
   if (query.budgetMaxCr == null) {
@@ -118,7 +133,10 @@ export function nextQuestion(lead: Lead, query: MatchQuery): string {
   if (!hasTimelineSignal(lead)) {
     return "To prioritise the best-fit options, are you hoping to move in soon, or over the next few months?";
   }
-  return "One last thing — will this be financed through a home loan, or self-funded?";
+  if (!hasFinancingSignal(lead)) {
+    return "One last thing — will this be financed through a home loan, or self-funded?";
+  }
+  return "You're all set — I have everything I need to find your best matches!";
 }
 
 const SHORT_AFFIRMATION_RE =

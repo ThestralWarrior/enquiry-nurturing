@@ -1,6 +1,6 @@
 import type { Lead } from "./types";
 import { KNOWN_LOCALITIES } from "./inventory";
-import { tokens, type MatchQuery } from "./matchProperties";
+import { tokens, getListingsByIds, type MatchQuery } from "./matchProperties";
 import { nextQuestion } from "./quickExtract";
 
 export type RiskKind = "listing" | "price" | null;
@@ -20,8 +20,38 @@ const PRICE_RE =
 // without any "suggest/show me" verb — that's just as much a request to
 // discuss specifics as a generic listing ask, and must be deferred the same
 // way rather than let the model engage with (and invent details about) it.
-const NAMED_PROJECT_RE =
-  /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(Camellias|Towers?|Heights|Residenc(?:y|es)|Park|Greens|Enclave|Estate|Gardens|Homes|Apartments|City|Vista|Court|Villas?|Floors?)\b|\b(?:DLF|Godrej|M3M|Sobha|Lodha|Prestige|Tata|Emaar|Adani|Hiranandani|Purvankara|Brigade|Unitech|Ansal|Omaxe|Supertech|Amrapali)\b/;
+// Global + case-insensitive so callers can pull out every match to check
+// against listings already shown to this lead (see `mentionsUnshownProject`).
+const NAMED_PROJECT_RE_G =
+  /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Camellias|Towers?|Heights|Residenc(?:y|es)|Park|Greens|Enclave|Estate|Gardens|Homes|Apartments|City|Vista|Court|Villas?|Floors?)\b|\b(?:DLF|Godrej|M3M|Sobha|Lodha|Prestige|Tata|Emaar|Adani|Hiranandani|Purvankara|Brigade|Unitech|Ansal|Omaxe|Supertech|Amrapali)\b/gi;
+
+/**
+ * Titles of listings already shown to this lead (via attached property
+ * cards) — referencing one of these back is the client/model correctly
+ * discussing real, verified inventory, not hallucinating a project.
+ */
+function shownListingTitles(lead: Lead): string[] {
+  const ids = lead.messages.flatMap((m) => m.propertyIds ?? []);
+  if (ids.length === 0) return [];
+  return getListingsByIds(ids).map((l) => l.title.toLowerCase());
+}
+
+/**
+ * Does the text name a specific project that is NOT one already shown to
+ * this lead? A buyer saying "I like Emerald Greens, let's proceed" — or
+ * Priya replying "Great choice on Emerald Greens!" — is legitimate once
+ * Emerald Greens is one of the real cards already surfaced; only an
+ * unshown/invented name is a violation.
+ */
+function mentionsUnshownProject(text: string, lead: Lead): boolean {
+  const matches = text.match(NAMED_PROJECT_RE_G);
+  if (!matches) return false;
+  const shown = shownListingTitles(lead);
+  return matches.some((m) => {
+    const lower = m.toLowerCase();
+    return !shown.some((title) => title.includes(lower) || lower.includes(title));
+  });
+}
 
 /**
  * Detects the prompts the small model is most likely to fumble on: being
@@ -29,10 +59,10 @@ const NAMED_PROJECT_RE =
  * or to quote a price. For these we bypass the model and reply with a safe,
  * on-brand deferral.
  */
-export function detectRiskIntent(text: string): RiskKind {
+export function detectRiskIntent(text: string, lead: Lead): RiskKind {
   const t = text.trim();
   if (PRICE_RE.test(t)) return "price";
-  if (LISTING_RE.test(t) || NAMED_PROJECT_RE.test(t)) return "listing";
+  if (LISTING_RE.test(t) || mentionsUnshownProject(t, lead)) return "listing";
   return null;
 }
 
@@ -128,9 +158,10 @@ export function detectReplyRisk(text: string, lead: Lead): boolean {
   if (IMPLIES_INVENTORY_RE.test(text)) return true;
   if (NAMES_AREA_RE.test(text)) return true;
   // Even if the client named a real project first, the model must never
-  // engage with or describe it — defense in depth alongside the input-side
-  // check, in case a named-project mention slips through some other turn.
-  if (NAMED_PROJECT_RE.test(text)) return true;
+  // engage with or describe an UNSHOWN one — defense in depth alongside the
+  // input-side check. Referencing a listing already surfaced as a card is
+  // fine (that's real, verified inventory, not a hallucination).
+  if (mentionsUnshownProject(text, lead)) return true;
   if (localityLeaked(text, lead)) return true;
   return false;
 }

@@ -109,7 +109,7 @@ export async function POST(req: Request) {
   // better answer than a deferral and it's still zero-hallucination, since the
   // matching is plain arithmetic, not a model call. Otherwise fall back to the
   // on-brand deferral that keeps qualifying.
-  const risk = detectRiskIntent(content);
+  const risk = detectRiskIntent(content, lead);
   if (risk) {
     await appendMessage(leadId, "user", content);
     const query = quickExtract(withUserTurn(lead, content));
