@@ -30,16 +30,31 @@ The pitch: *industry‑average first response is ~8 hours; LeadPilot responds in
 | Tool | Version | Notes |
 |------|---------|-------|
 | **Node.js** | 18+ (tested on 24) | https://nodejs.org |
-| **Ollama** | 0.3+ | https://ollama.com/download — runs the local model |
-| **Model** | `qwen2.5:1.5b` (~1 GB) | pulled once with `ollama pull qwen2.5:1.5b` |
+| **Ollama** | 0.3+ | https://ollama.com/download — `setup.ps1` installs this for you on Windows if it's missing |
+| **Chat model** | `qwen2.5:1.5b` (~1 GB) | fast model for the live buyer-facing chat |
+| **Analysis model** | `qwen2.5:3b` (~2 GB, optional) | more capable model for background lead qualification — see [why](#why-two-models) |
 
 Runs comfortably on a normal Windows/Mac laptop with **no GPU** (CPU‑only inference).
 
 ---
 
-## Quick start (Windows — recommended for demos)
+## Quick start
 
-Everything is already installed and built on this machine. Two scripts, nothing to remember:
+### First time on a new machine (Windows)
+
+One command takes you from a fresh clone to a running app — installs Ollama if it's missing,
+pulls both models, runs `npm install`, creates `.env.local`, builds, and starts:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File setup.ps1
+
+# Or, to skip the larger 3B analysis model and save ~2 GB / some time:
+powershell -ExecutionPolicy Bypass -File setup.ps1 -SkipAnalyzeModel
+```
+
+It's safe to re-run — every step checks first and skips whatever's already done.
+
+### Every time after that (Windows)
 
 ```powershell
 # Start everything (Ollama + model warm-up + the app) and open your browser
@@ -56,7 +71,7 @@ It's safe to run again if the app is already up — it just detects that and ope
 `stop-demo.ps1` shuts the app down cleanly. It leaves Ollama itself running (so your *next* demo
 starts instantly with no re-download/re-warm) — pass `-All` if you want to stop Ollama too.
 
-## Manual setup (first install on a new machine)
+## Manual setup (macOS/Linux, or if you'd rather do it by hand)
 
 ```bash
 # 1. Install dependencies
@@ -143,6 +158,23 @@ An early version made the model spend ~6.5s *before the first word*. Three chang
 
 Result: **~0.9s to first token, ~2.5s full reply** on an i5 laptop, down from ~8.5s.
 
+### Why two models
+
+The live chat and the background lead-analysis step have opposite needs — chat is
+latency‑sensitive (a buyer is watching), analysis isn't (it runs after "request a callback",
+decoupled from the buyer's screen, and the dashboard just shows it whenever it's ready). So they
+use different models:
+
+- **Chat stays on `qwen2.5:1.5b`** — a bigger model here was tested and rejected: on this CPU,
+  `qwen2.5:3b` was 47–120% slower per turn with **no measurable safety/quality improvement**,
+  because the real safety net is the deterministic guardrail code below, not the model's own
+  judgment.
+- **Analysis defaults to `qwen2.5:3b`** if you have it (`OLLAMA_ANALYZE_MODEL` in `.env.local`,
+  set automatically by `setup.ps1`) — benchmarked head‑to‑head on 15 hand‑scripted transcripts:
+  **77% vs 53% structured‑field completeness**, zero new violations, at ~2.8x the latency
+  (~24s vs ~9s avg). That cost is free now that analysis doesn't block the buyer. Falls back to
+  the chat model automatically if the bigger one isn't installed (`-SkipAnalyzeModel` in setup).
+
 ### Why it won't embarrass you (guardrails)
 
 A 1.5B model is small, so quality is enforced, not hoped for:
@@ -227,10 +259,12 @@ ollama pull qwen2.5:3b
 
 | Command | Does |
 |---------|------|
+| `setup.ps1` | (Windows) fresh clone → running app: installs Ollama if missing, pulls both models, `npm install`, creates `.env.local`, builds, and starts |
+| `start-demo.ps1` | (Windows) check Ollama + model, warm, and launch (assumes `setup.ps1` has already run once) |
+| `stop-demo.ps1` | (Windows) stop the app cleanly; `-All` also stops Ollama |
 | `npm run dev` | Dev server with hot reload |
 | `npm run build` | Production build |
 | `npm start` | Run the production build |
-| `start-demo.ps1` | (Windows) check Ollama + model, warm, and launch |
 
 ---
 
